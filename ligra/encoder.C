@@ -54,12 +54,20 @@
 using namespace std;
 
 typedef pair<pair<uintE, uintE>, uintE> intTriple2;
+typedef tuple<uintE, uintE, intE, intE, intE> intQuintuple2;
 
 struct tripleCmp {
   bool operator()(intTriple2 a, intTriple2 b) {
     intEPair aa = a.first, bb = b.first;
     if (aa.first != bb.first) return aa.first < bb.first;
     return aa.second < bb.second;
+  }
+};
+
+struct quintupleCmp {
+  bool operator()(intQuintuple2 a, intQuintuple2 b) {
+    if (get<0>(a) != get<0>(b)) return get<0>(a) < get<0>(b);
+    return get<1>(a) < get<1>(b);
   }
 };
 
@@ -571,15 +579,265 @@ void encodeWeightedGraphFromFile(char* fname, bool isSymmetric, char* outFile,
   }
 }
 
+void encodeWeightedTemporalGraphFromFile(char* fname, bool isSymmetric, char* outFile,
+                                 bool binary) {
+  cout << "reading file..." << endl;
+  long n, m;
+  intEQuadruple* edges;
+  uintT* offsets;
+  if (binary) {
+    char* config = (char*)".config";
+    char* adj = (char*)".adj";
+    char* idx = (char*)".idx";
+    char configFile[strlen(fname) + strlen(config) + 1];
+    char adjFile[strlen(fname) + strlen(adj) + 1];
+    char idxFile[strlen(fname) + strlen(idx) + 1];
+    *configFile = *adjFile = *idxFile = '\0';
+    strcat(configFile, fname);
+    strcat(adjFile, fname);
+    strcat(idxFile, fname);
+    strcat(configFile, config);
+    strcat(adjFile, adj);
+    strcat(idxFile, idx);
+
+    ifstream in(configFile, ifstream::in);
+    // long n;
+    in >> n;
+    in.close();
+
+    ifstream in2(adjFile, ifstream::in | ios::binary);  // stored as uints
+    in2.seekg(0, ios::end);
+    long size = in2.tellg();
+    in2.seekg(0);
+    m = size / sizeof(uint);
+    char* s = (char*)malloc(size);
+    in2.read(s, size);
+    in2.close();
+    uintE* edges1 = (uintE*)s;
+    edges = newA(intEQuadruple, m);
+    parallel_for(long i = 0; i < m; i++) {
+      get<0>(edges[i]) = edges1[i];
+      get<1>(edges[i]) = 1;  // default weight
+      get<2>(edges[i]) = 0;  // default start_time
+      get<3>(edges[i]) = INT_E_MAX;  // default end_time
+    }
+    free(edges1);
+
+    ifstream in3(idxFile, ifstream::in | ios::binary);  // stored as longs
+    in3.seekg(0, ios::end);
+    size = in3.tellg();
+    in3.seekg(0);
+    if (n != size / sizeof(intT)) {
+      cout << "File size wrong\n";
+      abort();
+    }
+
+    char* t = (char*)malloc(size + sizeof(uintT));
+    in3.read(t, size);
+    in3.close();
+    offsets = (uintT*)t;
+    offsets[n] = m;
+  } else {
+    _seq<char> S = readStringFromFile(fname);
+    words W = stringToWords(S.A, S.n);
+    if (W.Strings[0] != (string) "WeightedTemporalAdjacencyGraph") {
+      cout << "Bad input file" << endl;
+      abort();
+    }
+
+    long len = W.m - 1;
+    n = atol(W.Strings[1]);
+    m = atol(W.Strings[2]);
+    if (len != n + 4 * m + 2) {
+      cout << "Bad input file" << endl;
+      abort();
+    }
+    offsets = newA(uintT, n + 1);
+    edges = newA(intEQuadruple, m);
+
+    offsets[n] = m;
+    {
+      parallel_for(long i = 0; i < n; i++) offsets[i] = atol(W.Strings[i + 3]);
+    }
+    {
+      parallel_for(long i = 0; i < m; i++) {
+        get<0>(edges[i]) = atol(W.Strings[i + n + 3]);
+        if (atol(W.Strings[i + n + 3]) < 0 || atol(W.Strings[i + n + 3]) >= n) {
+          cout << "Out of bounds: edge at index " << i << " is "
+               << atol(W.Strings[i + n + 3]) << endl;
+          abort();
+        }
+        get<1>(edges[i]) = atol(W.Strings[i + n + m + 3]);
+        get<2>(edges[i]) = atol(W.Strings[i + n + 2 * m + 3]);
+        get<3>(edges[i]) = atol(W.Strings[i + n + 3 * m + 3]);
+      }
+    }
+
+    W.del();  // to deal with performance bug in malloc
+  }
+
+  long* sizes = newA(long, 3);
+  sizes[0] = n;
+
+  uintE* Degrees = newA(uintE, n);
+  uintT* DegreesT = newA(uintT, n + 1);
+
+  /* Steps :
+      1. Sort within each in-edge/out-edge segment
+      2. sequentially compress edges using difference coding
+  */
+
+  {
+    parallel_for(long i = 0; i < n; i++) {
+      uintT o = offsets[i];
+      intT d = offsets[i + 1] - o;
+      if (d < 0 || d > n) {
+        cout << "degree out of bounds: vertex " << i << " has degree " << d
+             << endl;
+        abort();
+      }
+      Degrees[i] = DegreesT[i] = d;
+      if (d > 0) {
+        quickSort(edges + o, d, quadrupleFirstCmp());
+        uintT k = 0;
+        uintE lastRead = UINT_E_MAX;
+        // remove self-edges and duplicate edges
+        for (long j = 0; j < d; j++) {
+          intEQuadruple e = edges[o + j];
+          if (get<0>(e) != i && get<0>(e) != lastRead) {
+            lastRead = get<0>(e);
+            edges[o + k++] = e;
+          }
+        }
+        Degrees[i] = DegreesT[i] = k;
+      }
+    }
+  }
+
+  DegreesT[n] = 0;
+  cout << "m = " << m << endl;
+  // compute new m after duplicate edge removal
+  m = sequence::plusScan(DegreesT, DegreesT, n + 1);
+  sizes[1] = m;
+
+  cout << "new m = " << m << endl;
+
+  if (!isSymmetric) {
+    uintT* tOffsets = newA(uintT, n + 1);
+    { parallel_for(long i = 0; i < n; i++) tOffsets[i] = UINT_T_MAX; }
+    intEQuadruple* inEdges = newA(intEQuadruple, m);
+    intQuintuple2* temp = newA(intQuintuple2, m);
+
+    // Create m many new intPairs.
+    {
+      parallel_for(long i = 0; i < n; i++) {
+        uintT o = DegreesT[i];
+        intT d = DegreesT[i + 1] - o;
+        for (long j = 0; j < d; j++) {
+          intEQuadruple e = edges[offsets[i] + j];
+          temp[o + j] = make_tuple(get<0>(e), i, get<1>(e), get<2>(e), get<3>(e));
+        }
+      }
+    }
+
+    cout << "compressing out edges..." << endl;
+    // Compress the out-edges.
+    uchar* nEdges =
+        parallelCompressWeightedTemporalEdges(edges, offsets, n, m, Degrees);
+    long totalSpace = sizes[2] = offsets[n];
+    free(edges);
+    cout << "writing out edges..." << endl;
+    // write to binary file
+    ofstream out(outFile, ofstream::out | ios::binary);
+    out.write((char*)sizes, sizeof(long) * 3);  // write n, m and isSymmetric
+    out.write((char*)offsets, sizeof(uintT) * (n + 1));  // write offsets
+    out.write((char*)Degrees, sizeof(uintE) * n);
+    out.write((char*)nEdges, totalSpace);  // write edges
+
+    free(offsets);
+
+    /* From here on-out, we use temp, and tOffsets to guarantee
+        stability as after compression offsets is no longer a reliable source
+        of degree information. */
+
+    // Use quintupleCmp because when encoding we need monotonicity within
+    // an edge list.
+
+    quickSort(temp, m, quintupleCmp());
+
+    tOffsets[get<0>(temp[0])] = 0;
+    tOffsets[n] = m;
+    inEdges[0] = make_tuple(get<1>(temp[0]), get<2>(temp[0]), get<3>(temp[0]), get<4>(temp[0]));
+    {
+      parallel_for(long i = 1; i < m; i++) {
+        inEdges[i] = make_tuple(get<1>(temp[i]), get<2>(temp[i]), get<3>(temp[i]), get<4>(temp[i]));
+        if (get<0>(temp[i]) != get<0>(temp[i - 1])) {
+            tOffsets[get<0>(temp[i])] = i;
+        }
+      }
+    }
+    free(temp);
+
+    // fill in offsets of degree 0 vertices by taking closest non-zero
+    // offset to the right
+    sequence::scanIBack(tOffsets, tOffsets, n, minF<uintT>(), (uintT)m);
+
+    parallel_for(long i = 0; i < n; i++) Degrees[i] =
+        tOffsets[i + 1] - tOffsets[i];
+    cout << "compressing in edges..." << endl;
+    uchar* ninEdges =
+        parallelCompressWeightedTemporalEdges(inEdges, tOffsets, n, m, Degrees);
+    long tTotalSpace[0];
+    tTotalSpace[0] = tOffsets[n];
+    free(inEdges);
+    cout << "writing in edges..." << endl;
+    // write data for in-edges
+    out.write((char*)tTotalSpace, sizeof(long));          // space for in-edges
+    out.write((char*)tOffsets, sizeof(uintT) * (n + 1));  // write offsets
+    out.write((char*)Degrees, sizeof(uintE) * n);         // write degrees
+    out.write((char*)ninEdges, tTotalSpace[0]);           // write edges
+
+    out.close();
+    free(sizes);
+    free(tOffsets);
+    free(ninEdges);
+    free(Degrees);
+    free(DegreesT);
+  } else {
+    uchar* nEdges =
+        parallelCompressWeightedTemporalEdges(edges, offsets, n, m, Degrees);
+    long totalSpace = sizes[2] = offsets[n];
+    free(edges);
+
+    ofstream out(outFile, ofstream::out | ios::binary);
+    out.write((char*)sizes, sizeof(long) * 3);  // write n, m and isSymmetric
+    out.write((char*)offsets, sizeof(uintT) * (n + 1));  // write offsets
+    out.write((char*)Degrees, sizeof(uintE) * n);        // write degrees
+    out.write((char*)nEdges, totalSpace);                // write edges
+    out.close();
+
+    free(sizes);
+    free(offsets);
+    free(nEdges);
+    free(Degrees);
+    free(DegreesT);
+  }
+}
+
 int parallel_main(int argc, char* argv[]) {
   commandLine P(argc, argv, " [-b] [-s] [-w] <inFile> <outFile>");
   char* iFile = P.getArgument(1);
   char* outFile = P.getArgument(0);
+  
   bool binary = P.getOptionValue("-b");
   bool symmetric = P.getOptionValue("-s");
   bool weighted = P.getOptionValue("-w");
-  if (!weighted)
+  bool temporal = P.getOptionValue("-t");
+
+  if (!weighted && !temporal)
     encodeGraphFromFile(iFile, symmetric, outFile, binary);
-  else
+  else if (weighted && temporal)
+    encodeWeightedTemporalGraphFromFile(iFile, symmetric, outFile, binary);
+  else if (weighted)
     encodeWeightedGraphFromFile(iFile, symmetric, outFile, binary);
 }

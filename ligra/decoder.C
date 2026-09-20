@@ -63,6 +63,10 @@ struct printAdjT {
     *ss << target << endl;
     return true;
   }
+  bool srcTarg(uintE src, uintE target, intE weight, intE start_time, intE end_time, uintT edgeNumber) {
+    *ss << target << endl;
+    return true;
+  }
 };
 
 struct printWghT {
@@ -72,18 +76,42 @@ struct printWghT {
     *ss << weight << endl;
     return true;
   }
+  bool srcTarg(uintE src, uintE target, intE weight, intE start_time, intE end_time, uintT edgeNumber) {
+    *ss << weight << endl;
+    return true;
+  }
 };
 
-void writeAdjGraph(graph<compressedSymmetricVertex> G, ofstream *of, bool weighted) {
+struct printStartTimeT {
+  stringstream* ss;
+  printStartTimeT(stringstream *_ss) : ss(_ss) {}
+  bool srcTarg(uintE src, uintE target, intE weight, intE start_time, intE end_time, uintT edgeNumber) {
+    *ss << start_time << endl;
+    return true;
+  }
+};
+
+struct printEndTimeT {
+  stringstream* ss;
+  printEndTimeT(stringstream *_ss) : ss(_ss) {}
+  bool srcTarg(uintE src, uintE target, intE weight, intE start_time, intE end_time, uintT edgeNumber) {
+    *ss << end_time << endl;
+    return true;
+  }
+};
+
+void writeAdjGraph(graph<compressedSymmetricVertex> G, ofstream *of, bool weighted, bool temporal) {
   compressedSymmetricVertex *V = G.V;
   for (long i = 0; i < G.n; i++) {
     stringstream ss;
     uchar *nghArr = V[i].getOutNeighbors();
     uintT d = V[i].getOutDegree();
-    if(weighted)
-      decodeWgh(printAdjT(&ss), nghArr, i, d);
-    else
+    if (!weighted && !temporal)
       decode(printAdjT(&ss), nghArr, i, d);
+    else if (weighted && temporal)
+      decodeWghTemporal(printAdjT(&ss), nghArr, i, d);
+    else if (weighted)
+      decodeWgh(printAdjT(&ss), nghArr, i, d);
     *of << ss.str();
   }
   if(weighted) {
@@ -92,8 +120,29 @@ void writeAdjGraph(graph<compressedSymmetricVertex> G, ofstream *of, bool weight
       stringstream ss;
       uchar *nghArr = V[i].getOutNeighbors();
       uintT d = V[i].getOutDegree();
-      decodeWgh(printWghT(&ss), nghArr, i, d);
+      if (temporal)
+        decodeWghTemporal(printWghT(&ss), nghArr, i, d);
+      else
+        decodeWgh(printWghT(&ss), nghArr, i, d);
       *of << ss.str();    
+    }
+    if(temporal){
+        cout << "writing start time..." << endl;
+        for (long i = 0; i < G.n; i++) {
+            stringstream ss;
+            uchar *nghArr = V[i].getOutNeighbors();
+            uintT d = V[i].getOutDegree();
+            decodeWghTemporal(printStartTimeT(&ss), nghArr, i, d);
+            *of << ss.str();
+        }  
+        cout << "writing end time..." << endl;
+        for (long i = 0; i < G.n; i++) {
+            stringstream ss;
+            uchar *nghArr = V[i].getOutNeighbors();
+            uintT d = V[i].getOutDegree();
+            decodeWghTemporal(printEndTimeT(&ss), nghArr, i, d);
+            *of << ss.str();
+        }
     }
   }
 }
@@ -107,12 +156,18 @@ int parallel_main(int argc, char* argv[]) {
   char* iFile = P.getArgument(1);
   char* oFile = P.getArgument(0);
   bool weighted = P.getOptionValue("-w");
+  bool temporal = P.getOptionValue("-t");
   graph<compressedSymmetricVertex> G = readCompressedGraph<compressedSymmetricVertex>(iFile,1,0);
   long n = G.n, m = G.m;
 
   ofstream out(oFile,ofstream::out);
-  if(weighted) out << "WeightedAdjacencyGraph\n" << n << endl << m << endl;
-  else out << "AdjacencyGraph\n" << n << endl << m << endl;
+  if (!weighted && !temporal) 
+    out << "AdjacencyGraph\n" << n << endl << m << endl;
+  else if (weighted && temporal)
+    out << "WeightedTemporalAdjacencyGraph\n" << n << endl << m << endl;
+  else if (weighted)
+    out << "WeightedAdjacencyGraph\n" << n << endl << m << endl;
+
   cout<<"writing offsets..."<<endl;
   uintT* DegreesSum = newA(uintT,n);
   parallel_for(long i=0;i<n;i++) DegreesSum[i] = G.V[i].getOutDegree();
@@ -123,6 +178,6 @@ int parallel_main(int argc, char* argv[]) {
   free(DegreesSum);
   out << ss.str();
   cout << "writing edges..."<<endl;
-  writeAdjGraph(G,&out,weighted);
+  writeAdjGraph(G,&out,weighted,temporal);
   out.close();
 }

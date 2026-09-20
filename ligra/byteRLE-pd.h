@@ -32,6 +32,7 @@
 #include <iostream>
 #include <tuple>
 #include "parallel.h"
+#include "sequence.h"
 #include "utils.h"
 
 #define LAST_BIT_SET(b) (b & (0x80))
@@ -438,7 +439,7 @@ uintE *parallelCompressEdges(uintE *edges, uintT *offsets, long n, long m,
       charsUsedArr[i] = 2 * (ceil((Degrees[i] * 9) / 8) + 4);
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -452,7 +453,7 @@ uintE *parallelCompressEdges(uintE *edges, uintT *offsets, long n, long m,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 
@@ -499,6 +500,18 @@ int numBytesSigned(intE x) {
     return 1;
   else
     return 4;
+}
+
+// max bytes of weight, start_time, end_time
+int numBytesSignedTemporal(intE weight, intE start_time, intE end_time) {
+  int bytesWeight = numBytesSigned(weight);
+  int bytesStart = numBytesSigned(start_time);
+  int bytesEnd = numBytesSigned(end_time);
+
+  int maxBytes = bytesWeight;
+  if (bytesStart > maxBytes) maxBytes = bytesStart;
+  if (bytesEnd > maxBytes) maxBytes = bytesEnd;
+  return maxBytes;
 }
 
 template <class T>
@@ -624,6 +637,7 @@ inline void decodeWgh(T t, uchar *edgeStart, const uintE &source,
             }
           }
           // FIXME(Joana): Shouldn't there be a break here?
+          break;
         default:
           for (uint j = 0; j < runlength; j++) {
             uintE edge = (uintE)start[i] + (((uintE)start[i + 1]) << 8) +
@@ -764,6 +778,7 @@ inline void decodeWgh(T t, uchar *edgeStart, const uintE &source,
                 }
               }
               // FIXME(Joana): shouldn't there be a break here?
+              break;
             default:
               for (uint j = 0; j < runlength; j++) {
                 uintE edge = (uintE)myStart[i] +
@@ -1005,7 +1020,7 @@ uchar *parallelCompressWeightedEdges(intEPair *edges, uintT *offsets, long n,
       charsUsedArr[i] = 4 * (ceil((Degrees[i] * 9) / 8) + 4);  // to change
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -1019,7 +1034,7 @@ uchar *parallelCompressWeightedEdges(intEPair *edges, uintT *offsets, long n,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 
@@ -1246,6 +1261,7 @@ inline void decodeWghTemporal(T t, uchar *edgeStart, const uintE &source,
             }
           }
           // FIXME(Joana): shouldn't there be a break here?
+          break;
         default:
           for (uint j = 0; j < runlength; j++) {
             uintE edge = (uintE)start[i] + (((uintE)start[i + 1]) << 8) +
@@ -1364,7 +1380,7 @@ inline void decodeWghTemporal(T t, uchar *edgeStart, const uintE &source,
                 uintE w = myStart[i + 4];  // highest bit is sign bit
                 intE weight = (w & 0x80) ? -(w & 0x7f) : (w & 0x7f);
                 uintE st = myStart[i + 5];  // highest bit is sign bit
-                intE start_time = (st & 0x80) ? -(st & 0x7f) : (w & 0x7f);
+                intE start_time = (st & 0x80) ? -(st & 0x7f) : (st & 0x7f);
                 uintE et = myStart[i + 6];  // highest bit is sign bit
                 intE end_time = (et & 0x80) ? -(et & 0x7f) : (et & 0x7f);
                 i += 7;
@@ -1464,6 +1480,7 @@ inline void decodeWghTemporal(T t, uchar *edgeStart, const uintE &source,
                 }
               }
               // FIXME(Joana): shouldn't there be a break here?
+              break;
             default:
               for (uint j = 0; j < runlength; j++) {
                 uintE edge = (uintE)myStart[i] +
@@ -1514,7 +1531,7 @@ long compressWeightedTemporalEdges(uchar *start, long curOffset,
   start[curOffset++] = header;
 
   for (int i = 0; i < runlength; i++) {
-    uintE e = get<0>(savedEdges[edgeI + i]) - get<1>(savedEdges[edgeI + i - 1]);
+    uintE e = get<0>(savedEdges[edgeI + i]) - get<0>(savedEdges[edgeI + i - 1]);
     int bytesUsed = 0;
     for (int j = 0; j < numBytes; j++) {
       uchar curByte = e & 0xff;
@@ -1610,9 +1627,12 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
       int numBytes = 0, numBytesWeight = 0;
       while (1) {
         uintE difference = get<0>(myEdges[edgeI + runlength]) -
-                           get<0>((myEdges[edgeI + runlength - 1]);
+                           get<0>(myEdges[edgeI + runlength - 1]);
         intE weight = get<1>(myEdges[edgeI + runlength]);
-        if (difference < ONE_BYTE && numBytesSigned(weight) == 1) {
+        intE start_time = get<2>(myEdges[edgeI + runlength]);
+        intE end_time = get<3>(myEdges[edgeI + runlength]);
+        int curNumBytesWeight = numBytesSignedTemporal(weight, start_time, end_time);
+        if (difference < ONE_BYTE && curNumBytesWeight == 1) {
           if (!numBytes) {
             numBytes = 1;
             numBytesWeight = 1;
@@ -1627,7 +1647,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (difference < ONE_BYTE && numBytesSigned(weight) == 4) {
+        } else if (difference < ONE_BYTE && curNumBytesWeight == 4) {
           if (!numBytes) {
             numBytes = 1;
             numBytesWeight = 4;
@@ -1642,7 +1662,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (difference < TWO_BYTES && numBytesSigned(weight) == 1) {
+        } else if (difference < TWO_BYTES && curNumBytesWeight == 1) {
           if (!numBytes) {
             numBytes = 2;
             numBytesWeight = 1;
@@ -1657,7 +1677,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (difference < TWO_BYTES && numBytesSigned(weight) == 4) {
+        } else if (difference < TWO_BYTES && curNumBytesWeight == 4) {
           if (!numBytes) {
             numBytes = 2;
             numBytesWeight = 4;
@@ -1672,7 +1692,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (difference < THREE_BYTES && numBytesSigned(weight) == 1) {
+        } else if (difference < THREE_BYTES && curNumBytesWeight == 1) {
           if (!numBytes) {
             numBytes = 3;
             numBytesWeight = 1;
@@ -1687,7 +1707,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (difference < THREE_BYTES && numBytesSigned(weight) == 4) {
+        } else if (difference < THREE_BYTES && curNumBytesWeight == 4) {
           if (!numBytes) {
             numBytes = 3;
             numBytesWeight = 4;
@@ -1702,7 +1722,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
             edgeI += runlength;
             runlength = numBytes = 0;
           }
-        } else if (numBytesSigned(weight) == 1) {
+        } else if (curNumBytesWeight == 1) {
           if (!numBytes) {
             numBytes = 4;
             numBytesWeight = 1;
@@ -1766,7 +1786,7 @@ uchar *parallelCompressWeightedTemporalEdges(intEQuadruple *edges,
       charsUsedArr[i] = 8 * (ceil((Degrees[i] * 9) / 8) + 4);  // to change
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -1780,7 +1800,7 @@ uchar *parallelCompressWeightedTemporalEdges(intEQuadruple *edges,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 

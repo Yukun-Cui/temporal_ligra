@@ -258,7 +258,7 @@ void Compute(graph<vertex>& GA, long start_vertex_id, time_t start_time,
   fType* inverseNumPaths = NumPaths;
   {
     parallel_for(long i = 0; i < n; i++) inverseNumPaths[i] =
-        1 / inverseNumPaths[i];
+        (inverseNumPaths[i] == 0) ? 0 : 1 / inverseNumPaths[i];
   }
 
   Levels[round].del();

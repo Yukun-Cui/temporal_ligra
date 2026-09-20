@@ -264,7 +264,7 @@ inline void decodeInNghBreakEarly(V *v, long i, VS &vertexSubset, F &f, G &g,
 
 template <class V, class F, class G>
 inline void decodeOutNgh(V *v, long i, F &f, G &g) {
-  uintE d = v->getInDegree();
+  uintE d = v->getOutDegree();
   uchar *nghArr = v->getOutNeighbors();
 #ifdef WEIGHTED
   decodeWgh(denseForwardT<F, G>(f, g), nghArr, i, v->getOutDegree());

@@ -52,6 +52,9 @@ typedef pair<uintE, pair<uintE, intE>> intTriple;
 // <vertex_id, vertex_id, weight, start_time, end_time>
 typedef tuple<uintE, uintE, intE, intE, intE> intQuintuple;
 
+// <vertex_id, weight, start_time, end_time>
+typedef tuple<uintE, intE, intE, intE> intQuadruple;
+
 template <class E>
 struct pairFirstCmp {
   bool operator()(const pair<uintE, E>& a, const pair<uintE, E>& b) {
@@ -67,11 +70,20 @@ struct getFirst {
 // These are needed for weighted temporal graphs.
 struct quintupleFirstCmp {
   bool operator()(const intQuintuple& a, const intQuintuple& b) {
-    return get<0>(a) < get<1>(b);
+    return get<0>(a) < get<0>(b);
   }
 };
 struct quintupleGetFirst {
   uintE operator()(const intQuintuple& a) { return get<0>(a); }
+};
+
+struct quadrupleFirstCmp {
+  bool operator()(const intQuadruple& a, const intQuadruple& b) {
+    return get<0>(a) < get<0>(b);
+  }
+};
+struct quadrupleGetFirst {
+  uintE operator()(const intQuadruple& a) { return get<0>(a); }
 };
 
 template <class IntType>

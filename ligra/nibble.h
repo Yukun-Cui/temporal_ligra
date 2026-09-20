@@ -32,8 +32,11 @@ typedef unsigned char uchar;
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include "parallel.h"
 #include "utils.h"
+
+using namespace ligra;
 
 #define LAST_BIT_SET(b) (b & (0x8))
 #define EDGE_SIZE_PER_BYTE 3
@@ -81,7 +84,8 @@ long encode_nibbleval(uchar *start, long offset, long val) {
 */
 inline uintE decode_first_edge(uchar *&start, long *location, uintE source) {
   long val;
-  decode_val_nibblecode(start, location, val) long sign = val & 1;
+  decode_val_nibblecode(start, location, val);
+  long sign = val & 1;
   val >>= 1;  // get rid of sign
   long result = source;
   if (sign)
@@ -409,9 +413,9 @@ typedef tuple<uintE, intE, intE, intE> intEQuadruple;
   Returns:
     The new offset into the edge array
 */
-long sequentialCompressWeightedEdgeSet(uchar *edgeArray, long currentOffset,
-                                       uintT degree, uintE vertexNum,
-                                       intEQuadruple *savedEdges) {
+long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray, long currentOffset,
+                                               uintT degree, uintE vertexNum,
+                                               intEQuadruple *savedEdges) {
   if (degree > 0) {
     // Compress the first edge whole, which is signed difference coded
     // target ID

@@ -32,8 +32,11 @@ typedef unsigned char uchar;
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include "parallel.h"
 #include "utils.h"
+
+using namespace ligra;
 
 #define PARALLEL_DEGREE 1000
 
@@ -83,7 +86,8 @@ long encode_nibbleval(uchar *start, long offset, long val) {
 */
 inline uintE decode_first_edge(uchar *&start, long *location, uintE source) {
   long val;
-  decode_val_nibblecode(start, location, val) long sign = val & 1;
+  decode_val_nibblecode(start, location, val);
+  long sign = val & 1;
   val >>= 1;  // get rid of sign
   long result = source;
   if (sign)
@@ -504,7 +508,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
     for (long i = 0; i < numChunks; i++) {
       long o = i * PARALLEL_DEGREE;
       long end = min<long>(PARALLEL_DEGREE, degree - o);
-      intEPair *myEdges = savedEdges + o;
+      intEQuadruple *myEdges = savedEdges + o;
       if (i > 0) pOffsets[i - 1] = currentOffset - startOffset;
 
       // Compress the first edge whole, which is signed difference coded
@@ -537,7 +541,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
       currentOffset = encode_nibbleval(edgeArray, currentOffset, toCompress);
 
       // end_time
-      intE end_time = get<2>(myEdges[0]);
+      intE end_time = get<3>(myEdges[0]);
       if (end_time < 0)
         sign = 0;
       else
@@ -608,7 +612,7 @@ uchar *parallelCompressWeightedTemporalEdges(intEQuadruple *edges,
   {
     parallel_for(long i = 0; i < n; i++) {
       edgePts[i] = iEdges + charsUsedArr[i];
-      long charsUsed = sequentialCompressWeightedEdgeSet(
+      long charsUsed = sequentialCompressWeightedTemporalEdgeSet(
           (uchar *)(iEdges + charsUsedArr[i]), 0, degrees[i + 1] - degrees[i],
           i, edges + offsets[i]);
       charsUsed = (charsUsed + 1) / 2;

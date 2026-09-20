@@ -7,7 +7,7 @@ INTE = -DEDGELONG
 endif
 
 ifdef PD
-PD = -DPD
+PDFLAG = -DPD
 endif
 
 ifdef BYTE
@@ -37,25 +37,25 @@ GXX_FLAGS=#-Wall -Wextra -Werror
 
 ifdef CILK
 PCC = $(GXX)
-PCFLAGS = -std=c++14 $(GXX_FLAGS) -fcilkplus -lcilkrts -O3 -DCILK $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 $(GXX_FLAGS) -fcilkplus -lcilkrts -O3 -DCILK $(INTT) $(INTE) $(CODE) $(PDFLAG) $(MEM)
 PLFLAGS = -fcilkplus -lcilkrts
 
 else ifdef CILKDBG
 PCC = $(GXX)
-PCFLAGS = -std=c++14 $(GXX_FLAGS) -fcilkplus -lcilkrts -ggdb -DCILK $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 $(GXX_FLAGS) -fcilkplus -lcilkrts -ggdb -DCILK $(INTT) $(INTE) $(CODE) $(PDFLAG) $(MEM)
 PLFLAGS = -fcilkplus -lcilkrts
 
 else ifdef MKLROOT
 PCC = icpc
-PCFLAGS = -std=c++14 $(GXX_FLAGS) -O3 -DCILKP $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 $(GXX_FLAGS) -O3 -DCILKP $(INTT) $(INTE) $(CODE) $(PDFLAG) $(MEM)
 
 else ifdef OPENMP
 PCC = $(GXX)
-PCFLAGS = -std=c++14 $(GXX_FLAGS) -fopenmp -march=native -O3 -DOPENMP $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 $(GXX_FLAGS) -fopenmp -march=native -O3 -DOPENMP $(INTT) $(INTE) $(CODE) $(PDFLAG) $(MEM)
 
 else
 PCC = $(GXX)
-PCFLAGS = -std=c++14 $(GXX_FLAGS) -O3 $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 $(GXX_FLAGS) -O3 $(INTT) $(INTE) $(CODE) $(PDFLAG) $(MEM)
 endif
 
 COMMON= ligra.h ligra_app.h ligra_app_main.h graph.h compressedVertex.h vertex.h utils.h IO.h parallel.h gettime.h quickSort.h parseCommandLine.h byte.h byteRLE.h nibble.h byte-pd.h byteRLE-pd.h nibble-pd.h vertexSubset.h encoder.C blockRadixSort.h transpose.h index_map.h maybe.h sequence.h edgeMap_utils.h binary_search.h

@@ -30,8 +30,12 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include "parallel.h"
+#include "sequence.h"
 #include "utils.h"
+
+using namespace ligra;
 
 #define PARALLEL_DEGREE 1000
 
@@ -360,7 +364,7 @@ uintE *parallelCompressEdges(uintE *edges, uintT *offsets, long n, long m,
       charsUsedArr[i] = ceil((Degrees[i] * 9) / 8) + 4;
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -374,7 +378,7 @@ uintE *parallelCompressEdges(uintE *edges, uintT *offsets, long n, long m,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 
@@ -460,7 +464,7 @@ uchar *parallelCompressWeightedEdges(intEPair *edges, uintT *offsets, long n,
       charsUsedArr[i] = 2 * (ceil((Degrees[i] * 9) / 8) + 4);  // to change
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -474,7 +478,7 @@ uchar *parallelCompressWeightedEdges(intEPair *edges, uintT *offsets, long n,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 
@@ -534,6 +538,12 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
       // weight
       currentOffset =
           compressFirstEdge(edgeArray, currentOffset, 0, get<1>(myEdges[0]));
+      // start_time
+      currentOffset =
+          compressFirstEdge(edgeArray, currentOffset, 0, get<2>(myEdges[0]));
+      // end_time
+      currentOffset =
+          compressFirstEdge(edgeArray, currentOffset, 0, get<3>(myEdges[0]));
       for (uintT edgeI = 1; edgeI < end; edgeI++) {
         // Store difference between cur and prev edge.
         uintE difference = get<0>(myEdges[edgeI]) - get<0>(myEdges[edgeI - 1]);
@@ -571,7 +581,7 @@ uchar *parallelCompressWeightedTemporalEdges(intEQuadruple *edges,
       charsUsedArr[i] = 4 * (ceil((Degrees[i] * 9) / 8) + 4);  // to change
     }
   }
-  long toAlloc = sequence::plusScan(charsUsedArr, charsUsedArr, n);
+  long toAlloc = ligra::sequence::plusScan(charsUsedArr, charsUsedArr, n);
   uintE *iEdges = newA(uintE, toAlloc);
 
   {
@@ -585,7 +595,7 @@ uchar *parallelCompressWeightedTemporalEdges(intEQuadruple *edges,
   }
 
   // produce the total space needed for all compressed lists in chars.
-  long totalSpace = sequence::plusScan(charsUsedArr, compressionStarts, n);
+  long totalSpace = ligra::sequence::plusScan(charsUsedArr, compressionStarts, n);
   compressionStarts[n] = totalSpace;
   free(charsUsedArr);
 

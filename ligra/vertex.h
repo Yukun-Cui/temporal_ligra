@@ -148,9 +148,9 @@ inline size_t countOutNgh(V* v, long vtx_id, F& f) {
       for (size_t j = s; j < e; j++) {
         uintE ngh = v->getOutNeighbor(j);
 #ifdef WEIGHTED
-        if (f(vtx_id, ngh, v->getOutNeighbor(j)))
+        if (f(vtx_id, ngh, v->getOutWeight(j)))
 #elif WEIGHTED_TEMPORAL
-        if (f(vtx_id, ngh, v->getOutNeighbor(j), v->getOutStartTime(j),
+        if (f(vtx_id, ngh, v->getOutWeight(j), v->getOutStartTime(j),
               v->getOutEndTime(j)))
 #else
         if (f(vtx_id, ngh))
@@ -203,7 +203,7 @@ inline size_t packOutNgh(V* v, long vtx_id, Pred& p, bool* bits, uintE* tmp) {
       tmp[i] = ngh;
       bits[i] = p(vtx_id, ngh);
     }
-    size_t k = sequence::pack(tmp, v->getOutNeighbors(), bits, d);
+    size_t k = ligra::sequence::pack(tmp, v->getOutNeighbors(), bits, d);
     v->setOutDegree(k);
     return k;
   }

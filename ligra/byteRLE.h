@@ -406,6 +406,18 @@ int numBytesSigned(intE x) {
     return 4;
 }
 
+// max bytes of weight, start_time, end_time
+int numBytesSignedTemporal(intE weight, intE start_time, intE end_time) {
+  int bytesWeight = numBytesSigned(weight);
+  int bytesStart = numBytesSigned(start_time);
+  int bytesEnd = numBytesSigned(end_time);
+
+  int maxBytes = bytesWeight;
+  if (bytesStart > maxBytes) maxBytes = bytesStart;
+  if (bytesEnd > maxBytes) maxBytes = bytesEnd;
+  return maxBytes;
+}
+
 template <class T>
 inline void decodeWgh(T t, uchar *edgeStart, const uintE &source,
                       const uintT &degree, const bool par = true) {
@@ -527,6 +539,7 @@ inline void decodeWgh(T t, uchar *edgeStart, const uintE &source,
               return;
             }
           }
+          break;
         default:
           for (uint j = 0; j < runlength; j++) {
             uintE edge = (uintE)edgeStart[i] +
@@ -997,6 +1010,7 @@ inline void decodeWghTemporal(T t, uchar *edgeStart, const uintE &source,
               return;
             }
           }
+          break;
         default:
           for (uint j = 0; j < runlength; j++) {
             uintE edge = (uintE)edgeStart[i] +
@@ -1136,7 +1150,10 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
                          get<0>(savedEdges[edgeI + runlength - 1]);
       // weight
       intE weight = get<1>(savedEdges[edgeI + runlength]);
-      if (difference < ONE_BYTE && numBytesSigned(weight) == 1) {
+      intE start_time = get<2>(savedEdges[edgeI + runlength]);
+      intE end_time = get<3>(savedEdges[edgeI + runlength]);
+      int curNumBytesWeight = numBytesSignedTemporal(weight, start_time, end_time);
+      if (difference < ONE_BYTE && curNumBytesWeight == 1) {
         if (!numBytes) {
           numBytes = 1;
           numBytesWeight = 1;
@@ -1151,7 +1168,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (difference < ONE_BYTE && numBytesSigned(weight) == 4) {
+      } else if (difference < ONE_BYTE && curNumBytesWeight == 4) {
         if (!numBytes) {
           numBytes = 1;
           numBytesWeight = 4;
@@ -1166,7 +1183,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (difference < TWO_BYTES && numBytesSigned(weight) == 1) {
+      } else if (difference < TWO_BYTES && curNumBytesWeight == 1) {
         if (!numBytes) {
           numBytes = 2;
           numBytesWeight = 1;
@@ -1181,7 +1198,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (difference < TWO_BYTES && numBytesSigned(weight) == 4) {
+      } else if (difference < TWO_BYTES && curNumBytesWeight == 4) {
         if (!numBytes) {
           numBytes = 2;
           numBytesWeight = 4;
@@ -1196,7 +1213,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (difference < THREE_BYTES && numBytesSigned(weight) == 1) {
+      } else if (difference < THREE_BYTES && curNumBytesWeight == 1) {
         if (!numBytes) {
           numBytes = 3;
           numBytesWeight = 1;
@@ -1211,7 +1228,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (difference < THREE_BYTES && numBytesSigned(weight) == 4) {
+      } else if (difference < THREE_BYTES && curNumBytesWeight == 4) {
         if (!numBytes) {
           numBytes = 3;
           numBytesWeight = 4;
@@ -1226,7 +1243,7 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
           edgeI += runlength;
           runlength = numBytes = 0;
         }
-      } else if (numBytesSigned(weight) == 1) {
+      } else if (curNumBytesWeight == 1) {
         if (!numBytes) {
           numBytes = 4;
           numBytesWeight = 1;

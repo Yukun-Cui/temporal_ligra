@@ -30,8 +30,11 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include "parallel.h"
 #include "utils.h"
+
+using namespace ligra;
 
 #define LAST_BIT_SET(b) (b & (0x80))
 #define EDGE_SIZE_PER_BYTE 7
@@ -478,6 +481,12 @@ long sequentialCompressWeightedTemporalEdgeSet(uchar *edgeArray,
     // weight
     currentOffset =
         compressFirstEdge(edgeArray, currentOffset, 0, get<1>(savedEdges[0]));
+    
+    // start_time
+    currentOffset = compressFirstEdge(edgeArray, currentOffset, 0, get<2>(savedEdges[0]));
+
+    // end_time
+    currentOffset = compressFirstEdge(edgeArray, currentOffset, 0, get<3>(savedEdges[0]));
 
     for (uintT edgeI = 1; edgeI < degree; edgeI++) {
       // Store difference between cur and prev edge.
